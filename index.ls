@@ -7,57 +7,21 @@ Node.prototype.attr = ->
   @
 
 node = doc.getElementById(\svg)
-mouse = do
-  target: null
-  down: (e) -> 
-    @target = e.target
-    @{sx, sy} = {sx: e.clientX, sy: e.clientY}
-  move: (e) -> 
-    if !e.buttons => return @target = null
-    {cx, cy} = {cx: e.clientX, cy: e.clientY}
-    if @target => 
-      {owner,type,idx} = @target{owner,type,idx}
-      if !owner => return
-      b = owner.root.getBoundingClientRect!
-      [cx,cy] = [cx - b.left, cy - b.top]
-      if type == Path.BOXPTR =>
-        b = owner.box
-        [x,y] = [idx % 2, +(idx > 1)]
-        if (!x and b.1.0 > cx) or (x and b.0.0 < cx) => b[x]0 = cx else b[x]0 = b[+!x]0 + 2 * x - 1
-        if (!y and b.1.1 > cy) or (y and b.0.1 < cy) => b[y]1 = cy else b[y]1 = b[+!y]1 + 2 * y - 1
-        owner.resize-pts!
-        owner.update!
-      else if type == Path.POINT =>
-        [p,b] = [owner.pts, owner.box]
-        p[idx].anchor.0 = cx
-        p[idx].anchor.1 = cy
-        owner.resize-box!
-        owner.update!
-      else if type == Path.CTRL =>
-        a = owner.pts[idx].anchor
-        ctrl = owner.pts[idx][@target.ctrl]
-        ctrl.0 = cx - a.0
-        ctrl.1 = cy - a.1
-        owner.update!
-  up: ->
-    if @target and @target.owner and @target.type == Path.POINT => 
-      if @target.owner.active => that.active = false
-      @target.active = true
-      @target.owner.active = @target
-      @target.owner.update!
-    @target = null
-handler = do
-  mousedown: mouse.down
-  mousemove: mouse.move
-  mouseup: mouse.up
-[[k,v] for k,v of handler].map ([k,v]) -> node.addEventListener k,v
 
 Path = (root) ->
-  @root = root
+  if !root => 
+    @root = root = doc.createElementNS(svg, 'svg')
+    root.attr do
+      width: \400px
+      height: \400px
+      viewport: "0 0 400 400"
+      preserveAspectRatio: "xMidYMid"
+      class: "lddraw simple"
+  root.owner = @
   b = root.getBoundingClientRect!
   @ <<< do
     box: [ [b.width * 0.2, b.height * 0.2], [b.width * 0.8, b.height * 0.8] ]
-    pts: [{ctrl1: [0,0], ctrl2: [0,0], anchor: [0,0]}]
+    pts: []
     dom: {pts: [], ctrl1: {line: [], pts: []}, ctrl2: {line: [], pts: []}}
 
   # path
@@ -80,7 +44,7 @@ Path = (root) ->
 
   # randomize points for testing
   step = 0.6
-  @pts = for r from 0 til 6.28 by step =>
+  if false => @pts = for r from 0 til 6.28 by step =>
     x = 200 + 100 * Math.cos(r)
     y = 200 + 100 * Math.sin(r)
     cx1 = 200 + 100 * Math.cos(r - step/3) - x
@@ -89,10 +53,10 @@ Path = (root) ->
     cy2 = 200 + 100 * Math.sin(r + step/3) - y
     {ctrl1: [cx1,cy1], ctrl2: [cx2,cy2], anchor: [x,y]}
   @update!
-
   #stroke writing animation
   @curpercent = 0
   setInterval (~>
+    return
     if !@dom.path => return
     if @curpercent < 1 =>
       curlen = @pathlen * @curpercent
@@ -103,6 +67,10 @@ Path = (root) ->
     @curpercent += 0.05
     if @curpercent >= 2 => @curpercent = 0
   ),100
+
+  root.addEventListener \mousedown, @mouse.down
+  root.addEventListener \mousemove, @mouse.move
+  root.addEventListener \mouseup, @mouse.up
   @
 
 Path.prototype <<< do
@@ -129,10 +97,15 @@ Path.prototype <<< do
       pts.anchor.0 = ( pts.anchor.0 - box.0.0 ) * rx + @box.0.0
       pts.anchor.1 = ( pts.anchor.1 - box.0.1 ) * ry + @box.0.1
     
+  reset: ->
+    @pts = []
+    @resize-box!
+    @update!
+
   update: ->
     if @dom.pts.length - @pts.length =>
       if that > 0 => 
-        for i from @dom.pts.length + 1 to @pts.length by -1 =>
+        for i from @dom.pts.length til @pts.length by -1 =>
           @root.removeChild @dom.pts.pop!
           @root.removeChild @dom.ctrl1.line.pop!
           @root.removeChild @dom.ctrl1.pts.pop!
@@ -140,7 +113,6 @@ Path.prototype <<< do
           @root.removeChild @dom.ctrl2.pts.pop!
       else
         for i from @dom.pts.length til @pts.length =>
-
           for c in <[ctrl1 ctrl2]> =>
 
             n = doc.createElementNS(svg, \line)
@@ -178,7 +150,6 @@ Path.prototype <<< do
       n.attr cx: x, cy: y
       n.style.fill = if n.active => \#f00 else \#fff
       n.idx = i
-
     for c in <[ctrl1 ctrl2]> =>
       @dom[c]pts.map (n,i) ~>
         [x,y] = @pts[i].anchor
@@ -201,11 +172,68 @@ Path.prototype <<< do
     @dom.path.attr d: Path.from-points @pts
     @pathlen = @dom.path.get-total-length!
 
+  mouse: do
+    target: null
+    down: (e) -> 
+      @target = e.target
+      @{sx, sy} = {sx: e.clientX, sy: e.clientY}
+    move: (e) -> 
+      if !e.buttons => return @target = null
+      {cx, cy} = {cx: e.clientX, cy: e.clientY}
+      if @target => 
+        {owner,type,idx} = @target{owner,type,idx}
+        if !owner => return
+        b = owner.root.getBoundingClientRect!
+        [cx,cy] = [cx - b.left, cy - b.top]
+        if type == Path.BOXPTR =>
+          b = owner.box
+          [x,y] = [idx % 2, +(idx > 1)]
+          if (!x and b.1.0 > cx) or (x and b.0.0 < cx) => b[x]0 = cx else b[x]0 = b[+!x]0 + 2 * x - 1
+          if (!y and b.1.1 > cy) or (y and b.0.1 < cy) => b[y]1 = cy else b[y]1 = b[+!y]1 + 2 * y - 1
+          owner.resize-pts!
+          owner.update!
+        else if type == Path.POINT =>
+          [p,b] = [owner.pts, owner.box]
+          p[idx].anchor.0 = cx
+          p[idx].anchor.1 = cy
+          owner.resize-box!
+          owner.update!
+        else if type == Path.CTRL =>
+          a = owner.pts[idx].anchor
+          ctrl = owner.pts[idx][@target.ctrl]
+          ctrl.0 = cx - a.0
+          ctrl.1 = cy - a.1
+          owner.update!
+        else if @target.nodeName.toLowerCase! == \svg => 
+          if owner.pts.length > 0 => last = owner.pts[* - 1].anchor
+          if owner.pts.length == 0 or (cx - last.0) ** 2 + (cy - last.1) ** 2 > 300 =>
+            owner.pts.push {ctrl1: [0,0], ctrl2: [0,0], anchor: [cx,cy]}
+            owner.resize-box!
+            owner.update!
+    up: ->
+      if @target and @target.owner and @target.type == Path.POINT => 
+        if @target.owner.active => that.active = false
+        @target.active = true
+        @target.owner.active = @target
+        @target.owner.update!
+      if @target and @target.owner and @target.nodeName.toLowerCase! == \svg =>
+        pts = @target.owner.pts
+        spline.add-ctrls pts
+        for p in pts => 
+          p.ctrl1.0 -= p.anchor.0
+          p.ctrl1.1 -= p.anchor.1
+          p.ctrl2.0 -= p.anchor.0
+          p.ctrl2.1 -= p.anchor.1
+        @target.owner.update!
+      @target = null
+
+
 Path <<< do
   POINT: 1
   CTRL: 2
   BOXPTR: 3
   from-points: (points, is-closed = false) ->
+    if !points or !points.length => return ""
     ret = "M#{points.0.anchor.0} #{points.0.anchor.1}"
     last = points.0
     if is-closed => points = points ++ [points.0]
@@ -219,5 +247,5 @@ Path <<< do
       last = item
     return ret
 
-
-new Path node
+path = new Path!
+$(\#root).0.appendChild path.root

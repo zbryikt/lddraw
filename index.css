@@ -19,7 +19,8 @@ svg {
   cursor: pointer;
 }
 .pts-ctrl-ptr {
-  fill: #777;
+  fill: rgba(0,0,0,0.2);
+  stroke: rgba(0,0,0,0.4);
 }
 .pts-ctrl-line {
   stroke: #444;
@@ -35,4 +36,9 @@ svg {
   stroke: #444;
   stroke-width: 0.5;
   stroke-dasharray: 3 6;
+}
+.simple .pts-ptr,
+.simple .pts-ctrl-ptr,
+.simple .ptr-ctrl-line {
+  display: none;
 }

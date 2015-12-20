@@ -15,7 +15,9 @@ html(lang="en")
     include library.jade
     // custom files
     link(rel="stylesheet",type="text/css",href="index.css")
+    script(type="text/javascript",src="spline.js")
     script(type="text/javascript",src="index.js")
   body
     #root
-      svg#svg(width="400px",height="400px",viewport="0 0 400 400",preserveAspectRatio="xMidYMid")
+      - var size = 100
+      //-svg#svg(width=size+"px",height=size+"px",viewport="0 0 "+size+" "+size,preserveAspectRatio="xMidYMid")
