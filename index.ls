@@ -89,6 +89,20 @@ Path = (root) ->
     cy2 = 200 + 100 * Math.sin(r + step/3) - y
     {ctrl1: [cx1,cy1], ctrl2: [cx2,cy2], anchor: [x,y]}
   @update!
+
+  #stroke writing animation
+  @curpercent = 0
+  setInterval (~>
+    if !@dom.path => return
+    if @curpercent < 1 =>
+      curlen = @pathlen * @curpercent
+      @dom.path.attr "stroke-dasharray": "#{curlen} #{@pathlen - curlen}"
+    else
+      curlen = @pathlen * ( @curpercent - 1 )
+      @dom.path.attr "stroke-dasharray": "0 #{curlen} #{@pathlen - curlen}"
+    @curpercent += 0.05
+    if @curpercent >= 2 => @curpercent = 0
+  ),100
   @
 
 Path.prototype <<< do
@@ -185,6 +199,7 @@ Path.prototype <<< do
       n.attr cx: x, cy: y
 
     @dom.path.attr d: Path.from-points @pts
+    @pathlen = @dom.path.get-total-length!
 
 Path <<< do
   POINT: 1
